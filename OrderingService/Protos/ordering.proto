@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option csharp_namespace = "OrderingService";
+
+package order;
+
+// The ordering service definition.
+service Ordering {
+  // Sends a greeting
+  rpc PlaceOrder (OrderRequest) returns (OrderResponse);
+}
+
+// The request message containing the user's name.
+message OrderRequest {
+  string description = 1;
+  int32 quantitity = 2;
+  int32 price = 3;
+  string delivery_date = 4;
+  string address = 5;
+  bool payment = 6;
+}
+
+// The response message containing the greetings.
+message OrderResponse {
+  string message = 1;
+}

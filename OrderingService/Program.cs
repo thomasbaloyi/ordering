@@ -20,27 +20,68 @@ await _dockerClient.Images.CreateImageAsync(imagesCreateParameters, null, new Pr
 
 string containerName = $"OrderDB";
 
-CreateContainerParameters createContainerParameters = new CreateContainerParameters()
-{
-    Image = "mcr.microsoft.com/mssql/server:2022-CU12-ubuntu-22.04",
-    HostConfig = new HostConfig()
-    {
-        DNS = new[] { "8.8.8.8", "8.8.4.4" }
-    },
-    Name = containerName
-};
-try
-{
-    await _dockerClient.Containers.CreateContainerAsync(createContainerParameters);
+int retryCount = 0;
 
-    
-} catch (Exception ex)
+var environmentVariables = new List<string>
 {
-    Console.WriteLine(ex.Message);
+    "ACCEPT_EULA=Y",
+    "MSSQL_SA_PASSWORD=oR!FzqF?5Eo#56gk"
+};
+
+do
+{
+    try
+    {
+        await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters()
+        {
+            Image = "mcr.microsoft.com/mssql/server:2022-CU12-ubuntu-22.04",
+            HostConfig = new HostConfig()
+            {
+                DNS = new[] { "8.8.8.8", "8.8.4.4" },
+                PortBindings = new Dictionary<string, IList<PortBinding>>
+                {
+                    {
+                        "1433/tcp",
+                        new List<PortBinding>
+                        {
+                            new PortBinding
+                            {
+                                HostPort = "1433"
+                            }
+                        }
+                    }
+                }
+            },
+            Name = containerName,
+            Env = environmentVariables,
+            ExposedPorts = new Dictionary<string, EmptyStruct>
+                {
+                    {"1433/tcp", new EmptyStruct()},
+                }
+        });
+
+        retryCount = 10;
+    } catch (DockerApiException)
+    {
+        try
+        {
+            await _dockerClient.Containers.RemoveContainerAsync(containerName, new ContainerRemoveParameters() { Force = true });
+        } catch
+        {
+            retryCount++;
+        }
+        
+    }
+} while (retryCount < 3);
+
+if (retryCount != 10)
+{
+
+    Console.WriteLine("Retry count exceeded. Could not create a container, please prune container with name OrderDB");
+    Environment.Exit(1);
 }
 
 await _dockerClient.Containers.StartContainerAsync(containerName, new ContainerStartParameters());
-
 
 #endregion
 
